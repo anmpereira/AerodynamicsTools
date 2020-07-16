@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
 from scipy import interpolate
+from scipy import optimize
 
 
 def _sampling(number_points: np.array, cosine_sampling: bool) -> np.array:
@@ -59,7 +60,7 @@ class NACA4:
             'xu': interpolate.interp1d(x, surface['xu'], kind='quadratic', assume_sorted=True),
             'yu': interpolate.interp1d(x, surface['yu'], kind='quadratic', assume_sorted=True),
             'xl': interpolate.interp1d(x, surface['xl'], kind='quadratic', assume_sorted=True),
-            'yl': interpolate.interp1d(x, surface['yl'], kind='quadratic', assume_sorted=True)
+            'yl': interpolate.interp1d(x, surface['yl'], kind='quadratic', assume_sorted=True),
         }
 
     def get_foil_data(self, nr_samples: np.array, cosine_sampling=True) -> dict:
@@ -75,6 +76,21 @@ class NACA4:
             'yu': interp['yu'](chord_coordinates)*c,
             'xl': interp['xl'](chord_coordinates)*c,
             'yl': interp['yl'](chord_coordinates)*c,
+        }
+
+    def get_slice(self, x_final):
+        interp = self._interpolators
+        c = self.chord_length
+        xu = optimize.minimize_scalar(lambda x: abs(interp['xu'](x) - x_final), method='Bounded', bounds=[0, 1]).x
+        xl = optimize.minimize_scalar(lambda x: abs(interp['xl'](x) - x_final), method='Bounded', bounds=[0, 1]).x
+
+        return {
+            'x': x_final*c,
+            'yc': interp['yc'](x_final)*c,
+            'dyc_dx': interp['dyc_dx'](x_final)*c,
+            'yu': interp['yu'](xu)*c,
+            'yl': interp['yl'](xl)*c,
+            'thickness': interp['yu'](xu)*c - interp['yl'](xl)*c
         }
 
     def _generate_surface_points(self, number_points: int or float, cosine_sampling: bool) -> np.array:
@@ -147,9 +163,9 @@ class Display(object):
 if __name__ == "__main__":
     # main()
     import matplotlib.pyplot as plt
+
     foil = NACA4('2212', 10, False)
-    data = foil.get_foil_data(100)
-    print(data['x'], data['yc'])
+    data = foil.get_foil_data(200)
 
     fig, ax = plt.subplots()
     plt.plot(data['xu'], data['yu'], 'b')
@@ -157,3 +173,10 @@ if __name__ == "__main__":
     plt.plot(data['x'], data['yc'], 'r')
     ax.grid()
     ax.set_aspect('equal')
+
+    slices = [0.01, 0.25, 0.5]
+    for sl in slices:
+        res = foil.get_slice(sl)
+        print(res['thickness'])
+        plt.plot([res['x'], res['x']], [res['yu'], res['yl']])
+
