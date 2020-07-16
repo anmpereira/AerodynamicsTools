@@ -34,9 +34,8 @@ class NACA4:
     """
     position_max_thickness = 0.30  # constant for NACA4 foils
 
-    def __init__(self, code: int or str, chord_length: float, closed_te: bool, number_points=100, cosine_sampling=True):
+    def __init__(self, code: int or str, closed_te: bool, number_points=100, cosine_sampling=True):
         self.code = str(code)
-        self.chord_length = chord_length
         self.closed_te = closed_te
 
         self.max_camber = float(self.code[0])/100
@@ -63,9 +62,9 @@ class NACA4:
             'yl': interpolate.interp1d(x, surface['yl'], kind='quadratic', assume_sorted=True),
         }
 
-    def get_foil_data(self, nr_samples: np.array, cosine_sampling=True) -> dict:
+    def get_foil_data(self, nr_samples: np.array, chord_length: float, cosine_sampling=True) -> dict:
         chord_coordinates = _sampling(nr_samples, cosine_sampling)
-        c = self.chord_length
+        c = chord_length
         interp = self._interpolators
 
         return {
@@ -78,9 +77,9 @@ class NACA4:
             'yl': interp['yl'](chord_coordinates)*c,
         }
 
-    def get_slice(self, x_final):
+    def get_slice(self, x_final: float, chord_length: float) -> dict:
         interp = self._interpolators
-        c = self.chord_length
+        c = chord_length
         xu = optimize.minimize_scalar(lambda x: abs(interp['xu'](x) - x_final), method='Bounded', bounds=[0, 1]).x
         xl = optimize.minimize_scalar(lambda x: abs(interp['xl'](x) - x_final), method='Bounded', bounds=[0, 1]).x
 
@@ -93,7 +92,7 @@ class NACA4:
             'thickness': interp['yu'](xu)*c - interp['yl'](xl)*c
         }
 
-    def _generate_surface_points(self, number_points: int or float, cosine_sampling: bool) -> np.array:
+    def _generate_surface_points(self, number_points: int or float, cosine_sampling: bool) -> dict:
         # setup data
         a0, a1, a2, a3, a4 = self.a_i
         m = self.max_camber
@@ -164,8 +163,9 @@ if __name__ == "__main__":
     # main()
     import matplotlib.pyplot as plt
 
-    foil = NACA4('2212', 10, False)
-    data = foil.get_foil_data(200)
+    foil = NACA4('2406', False, 400)
+    chord = 10
+    data = foil.get_foil_data(200, chord)
 
     fig, ax = plt.subplots()
     plt.plot(data['xu'], data['yu'], 'b')
@@ -176,7 +176,7 @@ if __name__ == "__main__":
 
     slices = [0.01, 0.25, 0.5]
     for sl in slices:
-        res = foil.get_slice(sl)
+        res = foil.get_slice(sl, chord)
         print(res['thickness'])
         plt.plot([res['x'], res['x']], [res['yu'], res['yl']])
 
