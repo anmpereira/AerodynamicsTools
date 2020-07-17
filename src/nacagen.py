@@ -20,7 +20,7 @@ from scipy import interpolate
 from scipy import optimize
 
 
-def _sampling(number_points: np.array, cosine_sampling: bool) -> np.array:
+def _sampling(number_points: int, cosine_sampling: bool) -> np.array:
     if cosine_sampling:
         beta = np.linspace(0, np.pi, number_points)
         x = 0.5*(1 - np.cos(beta))
@@ -34,7 +34,7 @@ class NACA4:
     """
     position_max_thickness = 0.30  # constant for NACA4 foils
 
-    def __init__(self, code: int or str, closed_te: bool, number_points=100, cosine_sampling=True):
+    def __init__(self, code: int or str, closed_te=True, number_points=100, cosine_sampling=True):
         self.code = str(code)
         self.closed_te = closed_te
 
@@ -62,7 +62,17 @@ class NACA4:
             'yl': interpolate.interp1d(x, surface['yl'], kind='quadratic', assume_sorted=True),
         }
 
-    def get_foil_data(self, nr_samples: np.array, chord_length: float, cosine_sampling=True) -> dict:
+    def get_foil_data(self, nr_samples: int, chord_length=1, cosine_sampling=True) -> dict:
+        """Return foil data
+
+        Args:
+            nr_samples (int): number of samples along the chord
+            chord_length (float): real chord length, rather than normalized
+            cosine_sampling (bool): whether to use cosine sampling along the chord
+
+        Returns:
+            dictionary with keys ('x','yc','dyc_dx','xu','yu','xl','yl')
+        """
         chord_coordinates = _sampling(nr_samples, cosine_sampling)
         c = chord_length
         interp = self._interpolators
@@ -77,7 +87,7 @@ class NACA4:
             'yl': interp['yl'](chord_coordinates)*c,
         }
 
-    def get_slice(self, x_final: float, chord_length: float) -> dict:
+    def get_slice(self, x_final: float, chord_length=1) -> dict:
         interp = self._interpolators
         c = chord_length
         xu = optimize.minimize_scalar(lambda x: abs(interp['xu'](x) - x_final), method='Bounded', bounds=[0, 1]).x
@@ -137,28 +147,6 @@ class NACA4:
         }
 
 
-class Display(object):
-    def __init__(self):
-        self.plt = plt
-        self.h = []
-        self.label = []
-        self.fig, self.ax = self.plt.subplots()
-        self.plt.axis('equal')
-        self.plt.xlabel('x')
-        self.plt.ylabel('y')
-        self.ax.grid(True)
-
-    def plot(self, X, Y, label=''):
-        h, = self.plt.plot(X, Y, '-', linewidth=1)
-        self.h.append(h)
-        self.label.append(label)
-
-    def show(self):
-        self.plt.axis((-0.1, 1.1) + self.plt.axis()[2:])
-        self.ax.legend(self.h, self.label)
-        self.plt.show()
-
-
 if __name__ == "__main__":
     # main()
     import matplotlib.pyplot as plt
@@ -179,4 +167,3 @@ if __name__ == "__main__":
         res = foil.get_slice(sl, chord)
         print(res['thickness'])
         plt.plot([res['x'], res['x']], [res['yu'], res['yl']])
-
